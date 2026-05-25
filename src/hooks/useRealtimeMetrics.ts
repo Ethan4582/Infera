@@ -12,11 +12,13 @@ export function useRealtimeMetrics() {
 
   const fetchInitial = useCallback(async () => {
     const sb = getSupabaseBrowser()
-    const { data } = await sb
+    const { data, error } = await sb
       .from('inference_logs')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(MAX_LOGS)
+
+    console.log('Dashboard fetch initial:', { data, error })
 
     if (data) setLogs(data.reverse() as InferenceLogRow[])
     setLoading(false)
@@ -32,13 +34,16 @@ export function useRealtimeMetrics() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'inference_logs' },
         (payload) => {
+          console.log('Realtime INSERT received:', payload)
           setLogs(prev => {
             const updated = [...prev, payload.new as InferenceLogRow]
             return updated.slice(-MAX_LOGS)
           })
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status)
+      })
 
     return () => {
       sb.removeChannel(channel)

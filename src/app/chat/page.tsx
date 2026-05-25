@@ -26,7 +26,7 @@ export default function ChatPage() {
               LLMTrace
             </h1>
             <select
-              value={model}
+              value={model || 'llama-3.3-70b-versatile'}
               onChange={e => setModel(e.target.value as ModelId)}
               disabled={isStreaming}
               className="rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"

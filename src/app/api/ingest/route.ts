@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { session_id, provider, model, latency_ms, prompt_tokens, completion_tokens, status } = body
 
-    if (!session_id || !provider || !model) {
+    if (!session_id || !provider || !model || model === 'EMPTY') {
       return NextResponse.json({ ok: true })
     }
 

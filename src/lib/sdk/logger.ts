@@ -1,9 +1,10 @@
 import type { InferenceLog } from './types'
 
 export function sendLog(log: InferenceLog): void {
-  fetch('/api/ingest', {
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  fetch(`${base}/api/ingest`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(log),
-  }).catch(() => {})
+  }).catch(console.error)
 }
