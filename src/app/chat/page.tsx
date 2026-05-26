@@ -51,7 +51,16 @@ export default function ChatPage() {
           </button>
         </div>
 
-        <div className="absolute top-4 right-4 z-10">
+        <div className="absolute top-4 right-4 z-10 flex gap-2">
+          <a
+            href="https://github.com/Ethan4582/t7.chat"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shadow-sm"
+            title="GitHub Repository"
+          >
+            <img src="github.png" className="w-4 h-4" />
+          </a>
           <Link href="/dashboard" className="flex items-center justify-center w-9 h-9 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shadow-sm" title="Dashboard">
             <BarChart2 className="w-4 h-4" />
           </Link>
