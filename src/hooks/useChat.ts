@@ -66,6 +66,9 @@ export function useChat() {
           signal: controller.signal,
         })
 
+        if (!res.ok) {
+          throw new Error(`API Error: ${res.status}`)
+        }
         if (!res.body) throw new Error('No response body')
 
         const reader = res.body.getReader()
@@ -87,10 +90,18 @@ export function useChat() {
               if (data === '[DONE]') break
               try {
                 const parsed = JSON.parse(data)
+                if (parsed.error) {
+                  throw new Error(parsed.error)
+                }
                 assistantContent += parsed.text
-              } catch (e) {
+              } catch (e: any) {
+                if (e.message && e.message !== 'Unexpected end of JSON input' && !e.message.includes('JSON')) {
+                  throw e
+                }
                 // fallback for older streams if necessary
-                assistantContent += data
+                if (!data.includes('"error"')) {
+                  assistantContent += data
+                }
               }
               setMessages(prev => {
                 const copy = [...prev]
@@ -102,9 +113,19 @@ export function useChat() {
         }
       } catch (e) {
         if ((e as Error).name !== 'AbortError') {
+          let errorMessage = 'Error: Failed to get response.'
+          
+          if (model === 'gemma2-9b-it' || model === 'mixtral-8x7b-32768') {
+            const mName = model === 'gemma2-9b-it' ? 'Gemma 2 9B' : 'Mixtral 8x7B'
+            errorMessage = `⚠️ **Model Discontinued:** The selected model (${mName}) has been discontinued by Groq. The app automatically recommends switching to **LLaMA 3.3 70B** for future messages. Please try again.`
+            setModel('llama-3.3-70b-versatile')
+          } else {
+            errorMessage = `⚠️ **Error:** ${(e as Error).message || 'Failed to get response.'}`
+          }
+
           setMessages(prev => [
             ...prev.slice(0, -1),
-            { role: 'assistant', content: 'Error: Failed to get response.' },
+            { role: 'assistant', content: errorMessage },
           ])
         }
       } finally {
@@ -142,6 +163,9 @@ export function useChat() {
           signal: controller.signal,
         })
 
+        if (!res.ok) {
+          throw new Error(`API Error: ${res.status}`)
+        }
         if (!res.body) throw new Error('No response body')
 
         const reader = res.body.getReader()
@@ -163,9 +187,18 @@ export function useChat() {
               if (data === '[DONE]') break
               try {
                 const parsed = JSON.parse(data)
+                if (parsed.error) {
+                  throw new Error(parsed.error)
+                }
                 assistantContent += parsed.text
-              } catch (e) {
-                assistantContent += data
+              } catch (e: any) {
+                if (e.message && e.message !== 'Unexpected end of JSON input' && !e.message.includes('JSON')) {
+                  throw e
+                }
+                // fallback for older streams if necessary
+                if (!data.includes('"error"')) {
+                  assistantContent += data
+                }
               }
               setMessages(prev => {
                 const copy = [...prev]
@@ -177,9 +210,17 @@ export function useChat() {
         }
       } catch (e) {
         if ((e as Error).name !== 'AbortError') {
+          let errorMessage = 'Error: Failed to get response.'
+          if (activeModel === 'gemma2-9b-it' || activeModel === 'mixtral-8x7b-32768') {
+            const mName = activeModel === 'gemma2-9b-it' ? 'Gemma 2 9B' : 'Mixtral 8x7B'
+            errorMessage = `⚠️ **Model Discontinued:** The selected model (${mName}) has been discontinued by Groq. The app automatically recommends switching to **LLaMA 3.3 70B** for future messages. Please try again.`
+            setModel('llama-3.3-70b-versatile')
+          } else {
+            errorMessage = `⚠️ **Error:** ${(e as Error).message || 'Failed to get response.'}`
+          }
           setMessages(prev => [
             ...prev.slice(0, -1),
-            { role: 'assistant', content: 'Error: Failed to get response.' },
+            { role: 'assistant', content: errorMessage },
           ])
         }
       } finally {

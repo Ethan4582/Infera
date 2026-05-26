@@ -40,7 +40,7 @@ export default function ChatPage() {
         </div>
       )}
 
-      <div className="flex flex-col flex-1 h-full min-w-0 relative">
+      <div className="flex flex-col flex-1 h-full min-w-0 min-h-0 relative">
         <div className="absolute top-4 left-4 z-10 hidden md:block">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}

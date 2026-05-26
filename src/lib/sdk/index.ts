@@ -19,6 +19,7 @@ export class LLMClient {
     } catch (e) {
       status = 'error'
       error = e instanceof Error ? e.message : 'unknown'
+      throw e
     } finally {
       const log: InferenceLog = {
         session_id: sessionId,

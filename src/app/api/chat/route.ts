@@ -36,7 +36,9 @@ export async function POST(req: NextRequest) {
           content: fullOutput,
         })
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-      } catch {
+      } catch (e: any) {
+        const errorMsg = e.message || 'Error generating response'
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: errorMsg })}\n\n`))
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
       } finally {
         controller.close()

@@ -10,12 +10,23 @@ import { BarChart2, ArrowLeft } from 'lucide-react'
 
 export default function DashboardPage() {
   const { logs: rawLogs, loading } = useRealtimeMetrics()
-  const logs = rawLogs.filter(l => Boolean(l.model && l.model.trim() !== ''))
   const [modelFilter, setModelFilter] = useState<string>('all')
+  const [timeRange, setTimeRange] = useState<string>('all')
   const [page, setPage] = useState(0)
 
+  const now = Date.now()
+  const filteredByTime = rawLogs.filter(l => {
+    if (timeRange === 'all') return true
+    const logTime = new Date(l.created_at).getTime()
+    const hours = { '1h': 1, '6h': 6, '24h': 24, '7d': 24 * 7, '30d': 24 * 30 }[timeRange] || 24
+    return (now - logTime) <= hours * 60 * 60 * 1000
+  })
+
+  const logs = filteredByTime.filter(l => Boolean(l.model && l.model.trim() !== ''))
   const filtered = modelFilter === 'all' ? logs : logs.filter(l => l.model === modelFilter)
-  const uniqueModels = [...new Set(logs.map(l => l.model))]
+  
+ 
+  const uniqueModels = [...new Set(rawLogs.filter(l => l.model).map(l => l.model))]
 
   const avgLatency = filtered.length > 0
     ? Math.round(filtered.reduce((s, l) => s + l.latency_ms, 0) / filtered.length)
@@ -50,14 +61,28 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-        <select
-          value={modelFilter}
-          onChange={e => setModelFilter(e.target.value)}
-          className="text-center rounded-lg bg-card border border-border text-foreground px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
-        >
-          <option value="all">All Models</option>
-          {uniqueModels.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
+        <div className="flex items-center gap-3">
+          <select
+            value={timeRange}
+            onChange={e => setTimeRange(e.target.value)}
+            className="text-center rounded-lg bg-card border border-border text-foreground px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+          >
+            <option value="1h">Last 1 hour</option>
+            <option value="6h">Last 6 hours</option>
+            <option value="24h">Last 24 hours</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="all">All time</option>
+          </select>
+          <select
+            value={modelFilter}
+            onChange={e => setModelFilter(e.target.value)}
+            className="text-center rounded-lg bg-card border border-border text-foreground px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+          >
+            <option value="all">All Models</option>
+            {uniqueModels.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
       </header>
 
       <div className="h-px bg-border" />
