@@ -1,98 +1,97 @@
 'use client'
 
-import { useRef, useEffect } from 'react'
+import { useMemo } from 'react'
 import type { InferenceLogRow } from '@/lib/supabase/types'
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@/components/ui/chart'
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 
 interface Props {
   logs: InferenceLogRow[]
 }
 
 export default function LatencyChart({ logs }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const { data, chartConfig } = useMemo(() => {
+    const validLogs = logs.filter(l => Boolean(l.model))
+    const sorted = [...validLogs].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    )
+    const recent = sorted.slice(-50)
+    const models = [...new Set(recent.map(l => l.model))]
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas || logs.length === 0) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const dpr = window.devicePixelRatio || 1
-    const rect = canvas.getBoundingClientRect()
-    canvas.width = rect.width * dpr
-    canvas.height = rect.height * dpr
-    ctx.scale(dpr, dpr)
-    const w = rect.width
-    const h = rect.height
-
-    ctx.clearRect(0, 0, w, h)
-
-    const data = logs.slice(-30)
-    const maxLatency = Math.max(...data.map(l => l.latency_ms), 100)
-    const padding = { top: 20, right: 20, bottom: 30, left: 50 }
-    const chartW = w - padding.left - padding.right
-    const chartH = h - padding.top - padding.bottom
-
-    ctx.strokeStyle = '#27272a'
-    ctx.lineWidth = 1
-    for (let i = 0; i <= 4; i++) {
-      const y = padding.top + (chartH / 4) * i
-      ctx.beginPath()
-      ctx.moveTo(padding.left, y)
-      ctx.lineTo(w - padding.right, y)
-      ctx.stroke()
-
-      ctx.fillStyle = '#71717a'
-      ctx.font = '10px system-ui'
-      ctx.textAlign = 'right'
-      ctx.fillText(`${Math.round(maxLatency - (maxLatency / 4) * i)}ms`, padding.left - 8, y + 3)
-    }
-
-    const gradient = ctx.createLinearGradient(0, padding.top, 0, h - padding.bottom)
-    gradient.addColorStop(0, 'rgba(99, 102, 241, 0.3)')
-    gradient.addColorStop(1, 'rgba(99, 102, 241, 0)')
-
-    ctx.beginPath()
-    ctx.moveTo(padding.left, h - padding.bottom)
-
-    data.forEach((log, i) => {
-      const x = padding.left + (chartW / Math.max(data.length - 1, 1)) * i
-      const y = padding.top + chartH * (1 - log.latency_ms / maxLatency)
-      ctx.lineTo(x, y)
+    const config: ChartConfig = {}
+    models.forEach((m, i) => {
+      const safeKey = m.replace(/\./g, '_')
+      config[safeKey] = { label: m, color: `var(--chart-${(i % 5) + 1})` }
     })
 
-    ctx.lineTo(padding.left + chartW, h - padding.bottom)
-    ctx.closePath()
-    ctx.fillStyle = gradient
-    ctx.fill()
+    const points = recent.map(l => ({
+      time: new Date(l.created_at).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
+      [l.model.replace(/\./g, '_')]: l.latency_ms,
+    }))
 
-    ctx.beginPath()
-    data.forEach((log, i) => {
-      const x = padding.left + (chartW / Math.max(data.length - 1, 1)) * i
-      const y = padding.top + chartH * (1 - log.latency_ms / maxLatency)
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
-    })
-    ctx.strokeStyle = '#6366f1'
-    ctx.lineWidth = 2
-    ctx.stroke()
-
-    data.forEach((log, i) => {
-      const x = padding.left + (chartW / Math.max(data.length - 1, 1)) * i
-      const y = padding.top + chartH * (1 - log.latency_ms / maxLatency)
-      ctx.beginPath()
-      ctx.arc(x, y, 3, 0, Math.PI * 2)
-      ctx.fillStyle = '#6366f1'
-      ctx.fill()
-    })
+    return { data: points.length === 1 ? [points[0], { ...points[0] }] : points, chartConfig: config }
   }, [logs])
 
+  if (logs.length === 0) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-4 flex items-center justify-center h-[280px]">
+        <p className="text-xs text-muted-foreground">No data yet</p>
+      </div>
+    )
+  }
+
+  const models = Object.keys(chartConfig)
+
   return (
-    <div className="rounded-xl bg-zinc-900/50 border border-zinc-800 p-4">
-      <h3 className="text-sm font-semibold text-zinc-300 mb-3">Latency (ms)</h3>
-      <canvas ref={canvasRef} className="w-full h-48" />
-      {logs.length === 0 && (
-        <p className="text-xs text-zinc-600 text-center mt-2">No data yet</p>
-      )}
+    <div className="rounded-xl border border-border bg-card p-4">
+      <h3 className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-3">Latency over time</h3>
+      <ChartContainer config={chartConfig} className="h-[240px] w-full">
+        <AreaChart data={data} margin={{ left: 0, right: 10, top: 5, bottom: 0 }}>
+          <CartesianGrid vertical={false} strokeDasharray="3 3" />
+          <XAxis
+            dataKey="time"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            minTickGap={32}
+            fontSize={10}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            tickFormatter={v => `${v}ms`}
+            fontSize={10}
+          />
+          <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+          {models.map(m => {
+            const safeKey = m.replace(/\./g, '_')
+            return (
+              <Area
+                key={m}
+                dataKey={safeKey}
+                type="monotone"
+                fill={`var(--color-${m})`}
+                fillOpacity={0.15}
+                stroke={`var(--color-${m})`}
+                strokeWidth={2}
+                dot={{ r: 3, fill: `var(--color-${m})`, strokeWidth: 0, fillOpacity: 1 }}
+                activeDot={{ r: 5, strokeWidth: 0 }}
+                connectNulls
+              />
+            )
+          })}
+        </AreaChart>
+      </ChartContainer>
     </div>
   )
 }

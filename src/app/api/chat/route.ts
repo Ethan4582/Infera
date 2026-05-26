@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       try {
         for await (const token of client.chat(messages, model as ModelId, sessionId)) {
           fullOutput += token
-          controller.enqueue(encoder.encode(`data: ${token}\n\n`))
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: token })}\n\n`))
         }
         // save assistant message
         await supabaseServer.from('messages').insert({

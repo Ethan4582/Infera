@@ -85,7 +85,88 @@ export function useChat() {
             if (line.startsWith('data: ')) {
               const data = line.slice(6)
               if (data === '[DONE]') break
-              assistantContent += data
+              try {
+                const parsed = JSON.parse(data)
+                assistantContent += parsed.text
+              } catch (e) {
+                // fallback for older streams if necessary
+                assistantContent += data
+              }
+              setMessages(prev => {
+                const copy = [...prev]
+                copy[copy.length - 1] = { role: 'assistant', content: assistantContent }
+                return copy
+              })
+            }
+          }
+        }
+      } catch (e) {
+        if ((e as Error).name !== 'AbortError') {
+          setMessages(prev => [
+            ...prev.slice(0, -1),
+            { role: 'assistant', content: 'Error: Failed to get response.' },
+          ])
+        }
+      } finally {
+        setIsStreaming(false)
+        abortRef.current = null
+      }
+    },
+    [messages, model, sessionId, isStreaming]
+  )
+
+  const regenerate = useCallback(
+    async (targetModel?: ModelId) => {
+      if (isStreaming || !sessionId || messages.length < 2) return
+
+      const lastUserIndex = messages.map(m => m.role).lastIndexOf('user')
+      if (lastUserIndex === -1) return
+
+      const updated = messages.slice(0, lastUserIndex + 1)
+      setMessages(updated)
+      setIsStreaming(true)
+
+      const activeModel = targetModel || model
+      if (targetModel && targetModel !== model) {
+        setModel(targetModel)
+      }
+
+      const controller = new AbortController()
+      abortRef.current = controller
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: updated, model: activeModel, sessionId }),
+          signal: controller.signal,
+        })
+
+        if (!res.body) throw new Error('No response body')
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let assistantContent = ''
+
+        setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          const chunk = decoder.decode(value)
+          const lines = chunk.split('\n')
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6)
+              if (data === '[DONE]') break
+              try {
+                const parsed = JSON.parse(data)
+                assistantContent += parsed.text
+              } catch (e) {
+                assistantContent += data
+              }
               setMessages(prev => {
                 const copy = [...prev]
                 copy[copy.length - 1] = { role: 'assistant', content: assistantContent }
@@ -114,5 +195,5 @@ export function useChat() {
     setIsStreaming(false)
   }, [])
 
-  return { messages, isStreaming, sessionId, model, setModel, sendMessage, stopStreaming, newSession, loadSession }
+  return { messages, isStreaming, sessionId, model, setModel, sendMessage, regenerate, stopStreaming, newSession, loadSession }
 }

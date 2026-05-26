@@ -1,53 +1,77 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useChat } from '@/hooks/useChat'
-import { PROVIDERS } from '@/constants/models'
+import { useConversations } from '@/hooks/useConversations'
 import ConversationList from '@/components/chat/ConversationList'
 import ChatWindow from '@/components/chat/ChatWindow'
 import ChatInput from '@/components/chat/ChatInput'
-import type { ModelId } from '@/lib/sdk/types'
 import Link from 'next/link'
+import { BarChart2, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 export default function ChatPage() {
-  const { messages, isStreaming, sessionId, model, setModel, sendMessage, stopStreaming, newSession, loadSession } = useChat()
+  const { messages, isStreaming, sessionId, model, setModel, sendMessage, regenerate, stopStreaming, newSession, loadSession } = useChat()
+  const { resume } = useConversations()
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+
+  useEffect(() => {
+    if (sessionId && messages.length === 0) {
+      setIsLoading(true)
+      resume(sessionId).then(msgs => {
+        if (msgs.length > 0) {
+          loadSession(sessionId, msgs)
+        }
+        setIsLoading(false)
+      })
+    }
+  }, [sessionId, resume, messages.length, loadSession])
 
   return (
-    <div className="flex h-screen bg-zinc-950 text-zinc-100">
-      <ConversationList
-        currentSessionId={sessionId}
-        onResume={loadSession}
-        onNew={newSession}
-      />
+    <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
+      {isSidebarOpen && (
+        <div className="hidden md:flex border-r border-sidebar-border">
+          <ConversationList
+            currentSessionId={sessionId}
+            onResume={loadSession}
+            onNew={newSession}
+            onLoadingChange={setIsLoading}
+          />
+        </div>
+      )}
 
-      <div className="flex flex-col flex-1">
-        <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-          <div className="flex items-center gap-3">
-            <h1 className="text-sm font-semibold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-              LLMTrace
-            </h1>
-            <select
-              value={model || 'llama-3.3-70b-versatile'}
-              onChange={e => setModel(e.target.value as ModelId)}
-              disabled={isStreaming}
-              className="rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-            >
-              {PROVIDERS.flatMap(p =>
-                p.models.map(m => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))
-              )}
-            </select>
-          </div>
-          <Link
-            href="/dashboard"
-            className="text-xs text-zinc-500 hover:text-indigo-400 transition-colors"
+      <div className="flex flex-col flex-1 h-full min-w-0 relative">
+        <div className="absolute top-4 left-4 z-10 hidden md:block">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shadow-sm"
+            title="Toggle Sidebar"
           >
-            Dashboard →
-          </Link>
-        </header>
+            {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+          </button>
+        </div>
 
-        <ChatWindow messages={messages} isStreaming={isStreaming} />
-        <ChatInput onSend={sendMessage} onStop={stopStreaming} isStreaming={isStreaming} />
+        <div className="absolute top-4 right-4 z-10">
+          <Link href="/dashboard" className="flex items-center justify-center w-9 h-9 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shadow-sm" title="Dashboard">
+            <BarChart2 className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <ChatWindow
+          messages={messages}
+          isStreaming={isStreaming}
+          model={model}
+          onSuggestion={sendMessage}
+          isLoading={isLoading}
+          onRetry={regenerate}
+        />
+        <ChatInput
+          onSend={sendMessage}
+          onStop={stopStreaming}
+          isStreaming={isStreaming}
+          model={model}
+          setModel={setModel}
+        />
       </div>
     </div>
   )
